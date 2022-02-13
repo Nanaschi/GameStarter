@@ -30,12 +30,25 @@
 
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations;
+using UnityEngine.ResourceManagement.ResourceLocations;
+using UnityEngine.ResourceManagement.ResourceProviders;
 
 //Class that allows scene references to work despite the mod that is currently loaded
 public class ReferenceLookupManager : MonoBehaviour
 {
     public static ReferenceLookupManager instance;
 
+    
+    // 1
+    public Dictionary<string, IResourceLocation> instances = 
+        new Dictionary<string, IResourceLocation>();
+
+// 2
+    private List<AsyncOperationHandle> loadedGameObjects = 
+        new List<AsyncOperationHandle>();
+    
     //The keys' of assets we want to pull from each mod (common names)
     public List<string> requiredAssets = new List<string>
     {
@@ -54,5 +67,41 @@ public class ReferenceLookupManager : MonoBehaviour
         {
             instance = this;
         }
+    }
+    
+    
+    public AsyncOperationHandle<GameObject> Instantiate(string key, Vector3 position, Vector3 facing, Transform parent)
+    {
+        // 2
+        if (!instances.ContainsKey(key))
+        {
+            Debug.LogError("The object you are looking for doesn't exist in this mod pack.");
+        }
+
+        // 3
+        InstantiationParameters instParams = 
+            new InstantiationParameters(position, Quaternion.LookRotation(facing), parent);
+
+        // 4
+        AsyncOperationHandle<GameObject> handle = 
+            Addressables.InstantiateAsync(instances[key], instParams, true);
+
+        // 5
+        loadedGameObjects.Add(handle);
+
+        return handle;
+    }
+    
+    public void ClearLoadedGameObjects()
+    {
+        foreach (AsyncOperationHandle handle in loadedGameObjects)
+        {
+            if (handle.Result != null)
+            {
+                Addressables.ReleaseInstance(handle);
+            }
+        }
+
+        loadedGameObjects.Clear();
     }
 }

@@ -67,6 +67,28 @@ public class ModManager : MonoBehaviour
     private void Start()
     {
         path = Application.dataPath + "/" + path;
+        
+        // 1
+        Addressables.InitializeAsync().Completed += handle =>
+        {
+            // 2
+            ModInfo defaultContent = new ModInfo
+            {
+                isDefault = true,
+                locator = handle.Result,
+                modAbsolutePath = "",
+                modFile = null,
+                modName = "Default"
+            };
+
+            // 3
+            mods.Add(defaultContent);
+            ReloadDictionary();
+            activatedMod = "Default";
+            LoadCurrentMod();
+        };
+
+        LoadMods();
     }
 
     public void RegisterListener(Action modChanged)
@@ -76,23 +98,76 @@ public class ModManager : MonoBehaviour
 
     private async void LoadMods()
     {
+        DirectoryInfo modDirectory = new DirectoryInfo(path);
 
+        foreach (FileInfo file in modDirectory.GetFiles())
+        {
+            if (file.Extension == ".json")
+            {
+                // 1
+                string modName = file.Name;
+                modName = modName.Replace(".json", "");
+                modName = modName.Replace("_", " ");
+                modName = System.Threading.Thread.CurrentThread.CurrentCulture.TextInfo.ToTitleCase(modName.ToLower());
+
+// 2
+                IResourceLocator modLocator = await LoadCatalog(file.FullName);
+
+// 3
+                ModInfo mod = new ModInfo
+                {
+                    modFile = file,
+                    modAbsolutePath = file.FullName,
+                    modName = modName,
+                    isDefault = false,
+                    locator = modLocator
+                };
+                mods.Add(mod);
+                ReloadDictionary();
+            }
+        }
     }
 
 
     private async Task<IResourceLocator> LoadCatalog (string path)
     {
-        return null;
+        AsyncOperationHandle<IResourceLocator> operation = 
+            Addressables.LoadContentCatalogAsync(path);
+// Wait until the catalog file is loaded 
+// then retrieve the IResourceLocator for this mod
+        IResourceLocator modLocator = await operation.Task; 
+        return modLocator;
+
     }
 
     public void ChangeMod (string newModName)
     {
-
+        lookupManager.ClearLoadedGameObjects();
+        activatedMod = newModName;
+        LoadCurrentMod();
     }
 
     private void LoadCurrentMod ()
     {
+        if (modDictionary.ContainsKey(activatedMod))
+        {
+            lookupManager.instances.Clear();
+            for (int i = 0; i < lookupManager.requiredAssets.Count; i++)
+            {
+                lookupManager.instances.Add(
+                    lookupManager.requiredAssets[i],
+                    FindAssetInMod(
+                        lookupManager.requiredAssets[i],
+                        modDictionary[activatedMod]
+                    )
+                );
+            }
 
+            for (int i = 0; i < modUpdateListeners.Count; i++)
+            {
+                modUpdateListeners[i]();
+            }
+        }
     }
 
     public IResourceLocation FindAssetInMod (string key, ModInfo mod)
@@ -102,7 +177,32 @@ public class ModManager : MonoBehaviour
 
     private void ReloadDictionary()
     {
+        modDictionary.Clear();
 
+        for (int i = 0; i < mods.Count; i++)
+        {
+            modDictionary.Add(mods[i].modName, mods[i]);
+        }
+
+        for (int i = 0; i < buttons.Count; i++)
+        {
+            GameObject.Destroy(buttons[i].gameObject);
+        }
+
+        buttons.Clear();
+
+        foreach (ModInfo info in mods)
+        {
+            Button newButton = Instantiate(buttonPrefab, buttonParent);
+            buttons.Add(newButton);
+
+            newButton.onClick.AddListener(() =>
+            {
+                ChangeMod(info.modName);
+            });
+
+            newButton.GetComponentInChildren<Text>().text = info.modName;
+        }
     }
 
 }

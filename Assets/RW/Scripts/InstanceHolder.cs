@@ -50,6 +50,6 @@ public class InstanceHolder : MonoBehaviour
     //This is called when the mod is updated
     private void ModUpdated()
     {
-
+        manager.lookupManager.Instantiate(nameReference, transform.position, transform.forward, this.transform);
     }
 }

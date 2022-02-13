@@ -60,7 +60,15 @@ public class Bullet : MonoBehaviour
         GetComponent<BoxCollider>().enabled = false;
 
         //Spawn a particle impact effect
-        GameObject particleSystem = GameObject.Instantiate(particleSystemInstance, other.GetContact(0).point, Quaternion.LookRotation(other.GetContact(0).normal), null);
-        Destroy(particleSystem, 1);
+        ReferenceLookupManager.instance.Instantiate(
+            "Debris",
+            other.GetContact(0).point,
+            other.GetContact(0).normal,
+            this.transform
+        ).Completed += go =>
+        {
+            go.Result.GetComponent<ParticleSystem>().Play();
+            GameObject.Destroy(go.Result, 1);
+        };
     }
 }

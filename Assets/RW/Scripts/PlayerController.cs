@@ -209,10 +209,12 @@ class ObjectPooler
         else
         {
             //This is where bullet instantiation is handled
-            instanceQueue.Enqueue
-            (
-                GameObject.Instantiate(gameObjectReference, position, Quaternion.LookRotation(faceDirection), null)
-            );
+            ReferenceLookupManager.instance.Instantiate(
+                "Bullet",
+                position,
+                faceDirection,
+                null
+            ).Completed += reference => { instanceQueue.Enqueue(reference.Result); };
         }
     }
 }
